@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=5.0, user-scalable=yes" />
+  <meta name="theme-color" content="#2196f3" />
+  <title>Hypertube - Torrent Scanner</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+        rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css?family=Noto+Sans+HK&display=swap"
+        rel="stylesheet" />
+
+  <style>
+    :root {
+      --primary:#2196f3;
+      --dark:#263238;
+      --light:#f5f5f5;
+      --text:#333;
+    }
+    body{
+      margin:0;
+      font-family:'Noto Sans HK',sans-serif;
+      background:var(--light);
+      color:var(--text);
+    }
+    .app{
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    header{
+      background:var(--primary);
+      color:#fff;
+      padding:1.5rem;
+      text-align:center;
+    }
+    header h1{margin:0;font-size:2rem;}
+    main{
+      flex:1;
+      max-width:900px;
+      margin:0 auto;
+      padding:2rem;
+    }
+    .search-box{
+      display:flex;
+      gap:10px;
+      margin-bottom:2rem;
+    }
+    .search-box input{
+      flex:1;
+      padding:10px;
+      border:1px solid #ddd;
+      border-radius:4px;
+      font-size:1rem;
+    }
+    .search-box button{
+      background:var(--dark);
+      color:#fff;
+      border:none;
+      padding:10px 20px;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:1rem;
+    }
+    .search-box button:hover{background:#1a232a;}
+    .loader{text-align:center;padding:2rem;color:#666;}
+    .movie-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+      gap:20px;
+    }
+    .movie-card{
+      background:#fff;
+      border-radius:8px;
+      overflow:hidden;
+      box-shadow:0 2px 8px rgba(0,0,0,.1);
+      transition:transform .2s;
+    }
+    .movie-card:hover{transform:translateY(-5px);}
+    .movie-card img{
+      width:100%;
+      height:300px;
+      object-fit:cover;
+      background:#eee;
+    }
+    .movie-info{
+      padding:10px;
+      text-align:center;
+    }
+    .movie-info h3{margin:0;font-size:1.1rem;}
+    .movie-info p{margin:5px 0 0;font-size:.9rem;color:#666;}
+    .offline-note{
+      text-align:center;
+      padding:1rem;
+      background:#fff3cd;
+      color:#856404;
+      border-radius:4px;
+      margin-bottom:1rem;
+      font-size:0.9rem;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🍿 Hypertube</h1>
+    <p>Scan, Find, and Add Torrents</p>
+  </header>
+
+  <main>
+    <div id="offlineBanner" class="offline-note" style="display:none;">
+      Running in preview mode (static). Showing demo results.
+    </div>
+
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search torrents (e.g. Terminator)..." />
+      <button onclick="fetchTorrents()">Search</button>
+    </div>
+
+    <div id="contentArea">
+      <div class="loader">Loading torrent engine…</div>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Demo data with working placeholder thumbnails
+  const DEMO_TORRENTS = [
+    { id: 1, title: "Terminator: Dark Fate", year: 2019, genre: "Action", rating: 6.2, seeders: 340, leechers: 89, size: "2.1GB", image: "https://placehold.co/200x300/png?text=Terminator+Dark+Fate", link: "magnet:?xt=urn:btih:demo1" },
+    { id: 2, title: "Terminator 2: Judgment Day", year: 1991, genre: "Sci-Fi", rating: 8.5, seeders: 1200, leechers: 310, size: "1.8GB", image: "https://placehold.co/200x300/png?text=T2+Judgment+Day", link: "magnet:?xt=urn:btih:demo2" },
+    { id: 3, title: "The Terminator", year: 1984, genre: "Action", rating: 8.0, seeders: 850, leechers: 200, size: "1.4GB", image: "https://placehold.co/200x300/png?text=The+Terminator", link: "magnet:?xt=urn:btih:demo3" },
+    { id: 4, title: "Terminator Genisys", year: 2015, genre: "Sci-Fi", rating: 6.3, seeders: 420, leechers: 150, size: "2.4GB", image: "https://placehold.co/200x300/png?text=Genisys", link: "magnet:?xt=urn:btih:demo4" },
+    { id: 5, title: "Terminator Salvation", year: 2009, genre: "Action", rating: 6.3, seeders: 310, leechers: 90, size: "2.0GB", image: "https://placehold.co/200x300/png?text=Salvation", link: "magnet:?xt=urn:btih:demo5" }
+  ];
+
+  function buildCard(t) {
+    // Fallback chain: API image → placehold.co with title → generic "No Poster"
+    const img = t.image 
+      ? t.image 
+      : `https://placehold.co/200x300/png?text=${encodeURIComponent(t.title || 'Movie')}`;
+    
+    const link = t.link || '#';
+    return `
+      <div class="movie-card">
+        <img 
+          src="${img}" 
+          alt="${t.title}" 
+          onerror="this.src='https://placehold.co/200x300/png?text=No+Poster'"
+        />
+        <div class="movie-info">
+          <h3>${t.title}</h3>
+          <p>${t.year || 'N/A'} • ${t.genre || '—'} • ${t.rating || '—'}/10</p>
+          <p>Seeds: ${t.seeders||0} | Peers: ${t.leechers||0}</p>
+          <a href="${link}" target="_blank" style="
+              display:inline-block;
+              margin-top:5px;
+              padding:4px 8px;
+              background:#333;
+              color:#fff;
+              text-decoration:none;
+              font-size:.8rem;
+            ">Get Torrent</a>
+        </div>
+      </div>`;
+  }
+
+  async function fetchTorrents() {
+    const query = document.getElementById('searchInput').value.trim();
+    const content = document.getElementById('contentArea');
+    const offlineBanner = document.getElementById('offlineBanner');
+
+    content.innerHTML = '<div class="loader">Searching torrents…</div>';
+
+    try {
+      const url = '/api/torrents/search' + (query ? `?q=${encodeURIComponent(query)}` : '');
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('Server returned ' + resp.status);
+      const data = await resp.json();
+
+      if (!data.movies || data.movies.length === 0) {
+        content.innerHTML = '<p style="text-align:center">No torrents found. Try another query.</p>';
+        return;
+      }
+
+      offlineBanner.style.display = 'none';
+      let html = '<div class="movie-grid">';
+      data.movies.forEach(t => { html += buildCard(t); });
+      html += '</div>';
+      content.innerHTML = html;
+    } catch (e) {
+      console.error('API failed, using demo data:', e);
+
+      offlineBanner.style.display = 'block';
+      let filtered = DEMO_TORRENTS;
+      if (query) {
+        filtered = DEMO_TORRENTS.filter(t =>
+          t.title.toLowerCase().includes(query.toLowerCase())
+        );
+      }
+
+      if (filtered.length === 0) {
+        content.innerHTML = '<p style="text-align:center">No demo results for "' + query + '".</p>';
+        return;
+      }
+
+      let html = '<div class="movie-grid">';
+      filtered.forEach(t => { html += buildCard(t); });
+      html += '</div>';
+      content.innerHTML = html;
+    }
+  }
+
+  // Load initial list
+  fetchTorrents();
+</script>
+</body>
+</html>
