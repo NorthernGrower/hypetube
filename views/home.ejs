@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hypertube - Home</title>
+  
+  <!-- Load the main preview CSS -->
+  <link rel="stylesheet" href="/index.html" type="text/css" /> <!-- This acts as a fallback if static -->
+</head>
+<body>
+
+  <div class="app">
+    <header>
+      <h1>🍿 Hypertube</h1>
+      <p>Welcome back!</p>
+    </header>
+
+    <main>
+      <!-- Search Bar -->
+      <div class="search-box">
+        <input type="text" placeholder="Search for movies..." />
+        <button>Search</button>
+      </div>
+
+      <!-- Container for Movie Cards -->
+      <div id="content-area">
+        <!-- EJS Logic would go here -->
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
+  <script>
+    // Simple EJS-side script to mimic the fetch behavior
+    document.addEventListener("DOMContentLoaded", () => {
+      const content = document.getElementById('content-area');
+      
+      // Fetch movies from your API
+      axios.get('/api/movies')
+        .then(response => {
+          const movies = response.data;
+          let html = '<div class="movie-grid">';
+          
+          movies.forEach(movie => {
+            html += `
+              <div class="movie-card">
+                <img src="${movie.poster || 'https://via.placeholder.com/200x300'}" alt="${movie.title}">
+                <div class="movie-info">
+                  <h3>${movie.title}</h3>
+                  <p>${movie.year}</p>
+                </div>
+              </div>
+            `;
+          });
+          
+          html += '</div>';
+          content.innerHTML = html;
+        })
+        .catch(error => {
+          content.innerHTML = '<p style="text-align:center">Connection established. Loading data...</p>';
+        });
+    });
+  </script>
+
+</body>
+</html>
